@@ -18,13 +18,41 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
 
   List<Band> bands = [
-    Band(id: '1', name: 'Metallica', votes: 5),
-    Band(id: '2', name: 'Guns', votes: 3),
-    Band(id: '3', name: 'Roses', votes: 2),
-    Band(id: '4', name: 'Oasis', votes: 1),
-    Band(id: '5', name: 'Creed', votes: 6),
+    // Band(id: '1', name: 'Metallica', votes: 5),
+    // Band(id: '2', name: 'Guns', votes: 3),
+    // Band(id: '3', name: 'Roses', votes: 2),
+    // Band(id: '4', name: 'Oasis', votes: 1),
+    // Band(id: '5', name: 'Creed', votes: 6),
 
   ];
+
+  @override
+  void initState() { 
+
+    final socketService = Provider.of<SocketService>(context, listen: false);
+    socketService.socket.on('active-bands', _handleActiveBands); //listener
+    super.initState();
+  }
+
+  _handleActiveBands(dynamic payload){
+     this.bands = (payload as List)
+        .map((band) => Band.fromMap(band))
+        .toString() as List<Band>;
+
+      setState(() { });
+  }
+
+
+
+
+
+  @override
+  void dispose() {
+    final socketService = Provider.of<SocketService>(context, listen: false);
+    socketService.socket.off('active-bands');
+    
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,12 +88,16 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _bandTile(Band band){
+    final socketService = Provider.of<SocketService>(context, listen: false);
+
+
     return Dismissible(
           key: Key(band.id),
           direction: DismissDirection.startToEnd,
-          onDismissed: (DismissDirection direction){
-            print('direction: $direction');
-            print('id: ${band.id}');
+          onDismissed: (_){
+            // print('direction: $direction');
+            // print('id: ${band.id}');
+            socketService.emit('delete-band', {'id': band.id});
 
           },
           background: Container(
@@ -83,9 +115,7 @@ class _HomePageState extends State<HomePage> {
         ),
         title: Text(band.name),
         trailing: Text('${ band.votes}',style: TextStyle(fontSize: 20),),
-        onTap: (){
-          print(band.name);
-        },
+        onTap: ()=> socketService.socket.emit('vote-band',{ 'id':band.id }),
 
       ),
     );
@@ -93,14 +123,13 @@ class _HomePageState extends State<HomePage> {
   addNewBand(){
 
     // para administrar el texto que se introduce
-    final TextEditingController textController = new TextEditingController();
+    final textController = new TextEditingController();
 
     
     if (Platform.isAndroid) { //version para android
         return showDialog(
                 context: context,
-                builder: (context){
-                  return AlertDialog(
+                builder: ( _ ) => AlertDialog(
                     title: Text('New band name: '),
                     content: TextField( controller: textController,),
                     actions: <Widget>[
@@ -111,15 +140,14 @@ class _HomePageState extends State<HomePage> {
                         onPressed: () => addBandToList(textController.text),
                         )
                     ],
-                  );
-                }
+                  )
+                
               );
     }
     
     showCupertinoDialog( // para IOS
       context: context, 
-      builder: (_){ // cuando no se utiliza el context se utiliza un guion bajo
-        return CupertinoAlertDialog(
+      builder: ( _ ) =>CupertinoAlertDialog(  // cuando no se utiliza el context se utiliza un guion bajo
           title: Text('New band name: '),
           content: CupertinoTextField(
             controller: textController,
@@ -137,25 +165,25 @@ class _HomePageState extends State<HomePage> {
             ),
           
           ],
-        );
-      }
+        )
+      
       );
 
   }
 
 void addBandToList(String name){
-  print(name);
+
   if (name.length > 1) {
-    this.bands.add(new Band(id: DateTime.now().toString(),name: name, votes: 0));
-    setState(() {
-      
-    });
+
+    final socketService = Provider.of<SocketService>(context, listen: false);
+    socketService.emit('add-band',{'name': name});
+   
 
   }
   Navigator.pop(context);
 
   
-}
+  }
 
 
 }
